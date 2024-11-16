@@ -77,8 +77,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Sponsored by [Dreamshot.io](https://dreamshot.io)
-- Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
-- Powered by [RunPod](https://runpod.io)
 
 ## 📞 Support
 
