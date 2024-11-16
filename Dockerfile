@@ -64,8 +64,8 @@ if [ -d "/runpod-volume" ]; then
     ln -s /runpod-volume/Comfyui/outputs /Comfyui/output
 fi
 
-# Start JupyterLab in the background
-jupyter lab --ip 0.0.0.0 --port 8888 --no-browser --allow-root &
+# Start JupyterLab in the background without authentication
+jupyter lab --ip 0.0.0.0 --port 8888 --no-browser --allow-root --ServerApp.token='' --ServerApp.password='' &
 
 # Start ComfyUI
 python3 main.py --listen 0.0.0.0 --port 3000 --enable-cors-header
