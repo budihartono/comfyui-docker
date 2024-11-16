@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /comfyui/custom_nodes
+cd /workspace/ComfyUI/custom_nodes
 
 # Read and install nodes from nodes.txt
 while IFS= read -r repo; do

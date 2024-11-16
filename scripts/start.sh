@@ -1,25 +1,30 @@
 #!/bin/bash
-cd /comfyui
+cd /workspace/ComfyUI
 
 # Setup network volume if available
 if [ -d "/runpod-volume" ]; then
     echo "Setting up network volume..."
     
     # Create directories if they don't exist
-    mkdir -p /runpod-volume/comfyui/models
-    mkdir -p /runpod-volume/comfyui/outputs
-    mkdir -p /runpod-volume/comfyui/custom_nodes
+    mkdir -p /runpod-volume/ComfyUI/models
+    mkdir -p /runpod-volume/ComfyUI/input
+    mkdir -p /runpod-volume/ComfyUI/output
+    mkdir -p /runpod-volume/ComfyUI/custom_nodes
     
-    # Link models directory if it has content
-    if [ "$(ls -A /runpod-volume/comfyui/models)" ]; then
+    # Link directories if they have content
+    if [ "$(ls -A /runpod-volume/ComfyUI/models)" ]; then
         echo "Using models from network volume"
-        rm -rf /comfyui/models
-        ln -s /runpod-volume/comfyui/models /comfyui/models
+        rm -rf /workspace/ComfyUI/models
+        ln -s /runpod-volume/ComfyUI/models /workspace/ComfyUI/models
     fi
     
-    # Link outputs directory
-    rm -rf /comfyui/output
-    ln -s /runpod-volume/comfyui/outputs /comfyui/output
+    # Link other directories
+    rm -rf /workspace/ComfyUI/input
+    rm -rf /workspace/ComfyUI/output
+    rm -rf /workspace/ComfyUI/custom_nodes
+    ln -s /runpod-volume/ComfyUI/input /workspace/ComfyUI/input
+    ln -s /runpod-volume/ComfyUI/output /workspace/ComfyUI/output
+    ln -s /runpod-volume/ComfyUI/custom_nodes /workspace/ComfyUI/custom_nodes
 fi
 
 # Install custom nodes and their requirements
