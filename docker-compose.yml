@@ -1,0 +1,10 @@
+services:
+  comfyui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yourusername/comfyui-runpod:latest
+    ports:
+      - "8188:8188"
+    volumes:
+      - ./test-volume:/runpod-volume
