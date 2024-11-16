@@ -23,10 +23,12 @@ ENV VIRTUAL_ENV=/opt/venv
 RUN python3.10 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Set working directory
-WORKDIR /Comfyui
+# Create base ComfyUI directory
+WORKDIR /workspace
+RUN mkdir -p Comfyui
 
-# Clone ComfyUI repository
+# Clone ComfyUI repository into the Comfyui directory
+WORKDIR /workspace/Comfyui
 RUN git clone https://github.com/comfyanonymous/ComfyUI .
 
 # Install Python dependencies
@@ -36,13 +38,13 @@ RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https:/
 # Install JupyterLab
 RUN pip3 install --no-cache-dir jupyterlab
 
-# Create directories
-RUN mkdir -p models
+# Create necessary directories under Comfyui
+RUN mkdir -p models input output custom_nodes
 
 # Create the start script
 COPY <<'EOF' /start.sh
 #!/bin/bash
-cd /Comfyui
+cd /workspace/Comfyui
 
 # Setup network volume if available
 if [ -d "/runpod-volume" ]; then
@@ -50,18 +52,24 @@ if [ -d "/runpod-volume" ]; then
     
     # Create directories if they don't exist
     mkdir -p /runpod-volume/Comfyui/models
-    mkdir -p /runpod-volume/Comfyui/outputs
+    mkdir -p /runpod-volume/Comfyui/input
+    mkdir -p /runpod-volume/Comfyui/output
+    mkdir -p /runpod-volume/Comfyui/custom_nodes
     
-    # Link models directory if it has content
+    # Link directories if they have content
     if [ "$(ls -A /runpod-volume/Comfyui/models)" ]; then
         echo "Using models from network volume"
-        rm -rf /Comfyui/models
-        ln -s /runpod-volume/Comfyui/models /Comfyui/models
+        rm -rf /workspace/Comfyui/models
+        ln -s /runpod-volume/Comfyui/models /workspace/Comfyui/models
     fi
     
-    # Link outputs directory
-    rm -rf /Comfyui/output
-    ln -s /runpod-volume/Comfyui/outputs /Comfyui/output
+    # Link other directories
+    rm -rf /workspace/Comfyui/input
+    rm -rf /workspace/Comfyui/output
+    rm -rf /workspace/Comfyui/custom_nodes
+    ln -s /runpod-volume/Comfyui/input /workspace/Comfyui/input
+    ln -s /runpod-volume/Comfyui/output /workspace/Comfyui/output
+    ln -s /runpod-volume/Comfyui/custom_nodes /workspace/Comfyui/custom_nodes
 fi
 
 # Start JupyterLab in the background without authentication
