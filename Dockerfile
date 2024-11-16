@@ -1,4 +1,5 @@
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+# Specify platform to avoid ARM-related issues
+FROM --platform=linux/amd64 nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
