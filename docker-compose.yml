@@ -3,8 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: yourusername/comfyui-runpod:latest
+    image: javierjrueda/comfyui-runpod:latest
     ports:
-      - "8188:8188"
+      - "3000:3000"
+      - "8888:8888"
     volumes:
       - ./test-volume:/runpod-volume
