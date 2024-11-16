@@ -1,34 +1,55 @@
 #!/bin/bash
 cd /workspace/ComfyUI
 
+# Debug: Print current directory and list contents
+echo "Current directory: $(pwd)"
+echo "Contents of /workspace/ComfyUI:"
+ls -la /workspace/ComfyUI
+
+# Debug: Check runpod-volume
+echo "Checking /runpod-volume..."
+if [ -d "/runpod-volume" ]; then
+    echo "✅ /runpod-volume exists"
+    ls -la /runpod-volume
+else
+    echo "❌ /runpod-volume does not exist"
+fi
+
 # Setup network volume if available
 if [ -d "/runpod-volume" ]; then
     echo "Setting up network volume..."
     
-    # Create directories if they don't exist
-    mkdir -p /runpod-volume/ComfyUI/models
-    mkdir -p /runpod-volume/ComfyUI/input
-    mkdir -p /runpod-volume/ComfyUI/output
-    mkdir -p /runpod-volume/ComfyUI/custom_nodes
+    # Create directories and debug their creation
+    for dir in models input output custom_nodes; do
+        mkdir -p "/runpod-volume/ComfyUI/$dir"
+        echo "Created /runpod-volume/ComfyUI/$dir: $?"
+    done
     
-    # Link directories if they have content
+    # Debug: Check symbolic links
+    echo "Creating symbolic links..."
+    for dir in input output custom_nodes; do
+        rm -rf "/workspace/ComfyUI/$dir"
+        ln -sf "/runpod-volume/ComfyUI/$dir" "/workspace/ComfyUI/$dir"
+        echo "Linked $dir: $?"
+        ls -la "/workspace/ComfyUI/$dir"
+    done
+    
+    # Special handling for models
     if [ "$(ls -A /runpod-volume/ComfyUI/models)" ]; then
         echo "Using models from network volume"
         rm -rf /workspace/ComfyUI/models
-        ln -s /runpod-volume/ComfyUI/models /workspace/ComfyUI/models
+        ln -sf /runpod-volume/ComfyUI/models /workspace/ComfyUI/models
+        echo "Linked models: $?"
+        ls -la /workspace/ComfyUI/models
     fi
-    
-    # Link other directories
-    rm -rf /workspace/ComfyUI/input
-    rm -rf /workspace/ComfyUI/output
-    rm -rf /workspace/ComfyUI/custom_nodes
-    ln -s /runpod-volume/ComfyUI/input /workspace/ComfyUI/input
-    ln -s /runpod-volume/ComfyUI/output /workspace/ComfyUI/output
-    ln -s /runpod-volume/ComfyUI/custom_nodes /workspace/ComfyUI/custom_nodes
 fi
+
+# Debug: Final structure
+echo "Final directory structure:"
+tree -L 2 /workspace/ComfyUI
 
 # Install custom nodes and their requirements
 bash /scripts/install_nodes.sh
 
 # Start ComfyUI
-python3 main.py --listen 0.0.0.0 --port 8188 --enable-cors-header
+python3 main.py --listen 0.0.0.0 --port 3000 --enable-cors-header

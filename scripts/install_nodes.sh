@@ -1,5 +1,7 @@
 #!/bin/bash
-cd /workspace/ComfyUI/custom_nodes
+# Move to script's directory to ensure relative paths work
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR/../ComfyUI/custom_nodes"
 
 # Read and install nodes from nodes.txt
 while IFS= read -r repo; do
@@ -24,4 +26,4 @@ while IFS= read -r repo; do
         echo "Installing requirements for $repo_name"
         pip3 install -r "$repo_name/requirements.txt"
     fi
-done < /custom_nodes_list/nodes.txt
+done < "../nodes.txt"

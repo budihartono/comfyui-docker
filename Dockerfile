@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     python3.10-venv \
     python3-pip \
     wget \
+    curl \
     libgl1-mesa-glx \
     libglib2.0-0 \
     ffmpeg \
@@ -36,16 +37,14 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # Install JupyterLab
-RUN pip3 install --no-cache-dir jupyterlab
+RUN pip3 install --no-cache-dir jupyterlab nodejs
 
 # Create necessary directories
-RUN mkdir -p /workspace/ComfyUI/models
-RUN mkdir -p /workspace/ComfyUI/input
-RUN mkdir -p /workspace/ComfyUI/output
-RUN mkdir -p /workspace/ComfyUI/custom_nodes
-
-# Create a directory for custom node scripts
-RUN mkdir -p /scripts
+RUN mkdir -p /workspace/ComfyUI/models \
+    /workspace/ComfyUI/input \
+    /workspace/ComfyUI/output \
+    /workspace/ComfyUI/custom_nodes \
+    /scripts
 
 # Create the start script
 COPY <<'EOF' /start.sh
@@ -89,5 +88,9 @@ RUN chmod +x /start.sh
 
 # Expose ports
 EXPOSE 3000 8888
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
 
 CMD ["/start.sh"]
