@@ -25,118 +25,98 @@ ENV VIRTUAL_ENV=/opt/venv
 RUN python3.10 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Set up the ComfyUI directory structure
+# Set up ComfyUI in workspace
 WORKDIR /workspace/ComfyUI
 
-# Clone ComfyUI repository
+# Clone ComfyUI repository and install dependencies
 RUN git clone https://github.com/comfyanonymous/ComfyUI . && \
-    # Install Python dependencies
     pip3 install --no-cache-dir -r requirements.txt && \
     pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 && \
-    # Install JupyterLab
     pip3 install --no-cache-dir jupyterlab nodejs
 
-# Create necessary directories
-RUN mkdir -p models input output custom_nodes && \
-    mkdir -p /scripts
+# Create basic directory structure
+RUN mkdir -p models input output custom_nodes
 
-# Set up volume management script
-COPY <<'EOF' /scripts/setup_volume.sh
+# Create the startup script
+COPY <<'EOF' /start.sh
 #!/bin/bash
+cd /workspace/ComfyUI
 
-echo "Setting up network volume..."
-VOLUME_ROOT="/runpod-volume/ComfyUI"
-WORKSPACE_ROOT="/workspace/ComfyUI"
+echo "🔍 Starting ComfyUI Setup..."
+echo "Python Version: $(python3 --version)"
+echo "CUDA Version: $(nvcc --version 2>/dev/null || echo 'NVCC not found')"
+echo "GPU Information: $(nvidia-smi 2>/dev/null || echo 'nvidia-smi not found')"
 
-# Create volume directories
-for dir in models input output custom_nodes; do
-    mkdir -p "$VOLUME_ROOT/$dir"
-    echo "Created $VOLUME_ROOT/$dir"
-done
+# Function to safely create directory structure
+create_dir_structure() {
+    local base_path="$1"
+    echo "Creating directory structure in $base_path/ComfyUI"
+    
+    for dir in models input output custom_nodes; do
+        mkdir -p "$base_path/ComfyUI/$dir"
+        echo "Created $base_path/ComfyUI/$dir"
+    done
+}
 
 # Function to safely create symlink
 create_symlink() {
     local src="$1"
     local dst="$2"
-    if [ -d "$src" ]; then
+    echo "Attempting to link: $dst -> $src"
+    
+    # Remove existing destination if it exists
+    if [ -L "$dst" ]; then
+        echo "Removing existing symlink $dst"
+        rm "$dst"
+    elif [ -d "$dst" ]; then
+        echo "Removing existing directory $dst"
         rm -rf "$dst"
+    fi
+
+    # Create the symlink
+    if [ -d "$src" ]; then
         ln -sf "$src" "$dst"
-        echo "✅ Linked $dst -> $src"
+        echo "✅ Created symlink: $dst -> $src"
         ls -la "$dst"
     else
         echo "❌ Source directory $src not found"
+        ls -la "$(dirname $src)"
     fi
 }
 
-# Link directories
-for dir in input output custom_nodes; do
-    create_symlink "$VOLUME_ROOT/$dir" "$WORKSPACE_ROOT/$dir"
-done
-
-# Special handling for models directory
-if [ "$(ls -A $VOLUME_ROOT/models)" ]; then
-    echo "Using models from network volume"
-    create_symlink "$VOLUME_ROOT/models" "$WORKSPACE_ROOT/models"
-else
-    echo "Network volume models directory is empty, using local models"
-fi
-
-echo "Volume setup complete"
-EOF
-
-RUN chmod +x /scripts/setup_volume.sh
-
-# Set up custom nodes installation script
-COPY <<'EOF' /scripts/install_nodes.sh
-#!/bin/bash
-
-cd /workspace/ComfyUI/custom_nodes
-
-# Add your custom nodes installation commands here
-# Example:
-# git clone https://github.com/example/custom-node
-# cd custom-node
-# pip install -r requirements.txt
-
-echo "Custom nodes installation complete"
-EOF
-
-RUN chmod +x /scripts/install_nodes.sh
-
-# Create the main startup script
-COPY <<'EOF' /start.sh
-#!/bin/bash
-cd /workspace/ComfyUI
-
-# Debug: Print environment info
-echo "🔍 Environment Information:"
-echo "Python Version: $(python3 --version)"
-echo "CUDA Version: $(nvcc --version 2>/dev/null || echo 'NVCC not found')"
-echo "GPU Information: $(nvidia-smi 2>/dev/null || echo 'nvidia-smi not found')"
-
-# Setup volume if available
+# Check for RunPod volume
 if [ -d "/runpod-volume" ]; then
-    bash /scripts/setup_volume.sh
+    echo "RunPod network volume detected at /runpod-volume"
+    
+    # Create directory structure in network volume
+    create_dir_structure "/runpod-volume"
+    
+    echo "Setting up symlinks..."
+    # Create symlinks for each directory
+    for dir in models input output custom_nodes; do
+        create_symlink "/runpod-volume/ComfyUI/$dir" "/workspace/ComfyUI/$dir"
+    done
+    
+    echo "Directory structure after setup:"
+    ls -la /workspace/ComfyUI/
+    echo "Network volume contents:"
+    ls -la /runpod-volume/ComfyUI/
 else
-    echo "⚠️ Warning: /runpod-volume not found, using local storage"
+    echo "⚠️ No RunPod network volume found, using local storage"
+    ls -la /
 fi
 
-# Install custom nodes
-bash /scripts/install_nodes.sh
-
-# Start JupyterLab in the background
+# Start JupyterLab
+echo "Starting JupyterLab..."
 jupyter lab --ip 0.0.0.0 --port 8888 --no-browser --allow-root --ServerApp.token='' --ServerApp.password='' &
 
 # Print final directory structure
 echo "📁 Final Directory Structure:"
 tree -L 3 /workspace/ComfyUI
 
-# Start ComfyUI with proper error handling
+# Start ComfyUI
 echo "🚀 Starting ComfyUI..."
-if ! python3 main.py --listen 0.0.0.0 --port 3000 --enable-cors-header; then
-    echo "❌ ComfyUI failed to start"
-    exit 1
-fi
+exec python3 main.py --listen 0.0.0.0 --port 3000 --enable-cors-header
 EOF
 
 RUN chmod +x /start.sh
