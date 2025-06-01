@@ -4,18 +4,36 @@ umask 002
 
 #
 # scripts/provision_models.sh
-#   - For each “CATEGORY_URLS” environment variable, download into the matching subfolder:
-#     e.g. CHECKPOINT_URLS → $BASE_MODELS_DIR/checkpoints/
-#   - If /runpod-volume/ComfyUI/models exists, use that as the base; otherwise fallback to $WORKSPACE/ComfyUI/models.
-#   - Skip any file whose basename already exists in that directory.
+#
+#   This script downloads “models” into the folder structure:
+#     $BASE_MODELS_DIR/<category>/
+#   for *any* <category> that appears in the PasteBin list.
+#
+#   It expects a single environment variable:
+#     MODEL_LIST_URL  (a raw-text URL, e.g. PasteBin “raw”)
+#
+#   PasteBin format (one non-empty, non-comment line per model):
+#     <category>|<url>
+#
+#   Example:
+#     checkpoints|https://huggingface.co/user/sd-v2-1.safetensors
+#     loras|https://huggingface.co/user/my-style-lora.safetensors
+#     clip|https://huggingface.co/user/clip-vit-l-14.safetensors
+#     custom|https://foo.com/bar/my_custom_model.safetensors
+#
+#   This version does *not* rely on any hardcoded CATEGORY_MAP. It simply:
+#     1) Fetches MODEL_LIST_URL
+#     2) Parses each <category> and <url>
+#     3) Creates $BASE_MODELS_DIR/<category>/ if it does not exist
+#     4) Downloads each URL into that subfolder if the file is not already present
 #
 
-# ──────── 1. Configuration / Category ↔ Subfolder Map ───────────────────────────
+# ──────────── 0. Determine which “models” folder to use ──────────────────────────
 
-# Ensure WORKSPACE is set (where ComfyUI is mounted). Default to /workspace:
+# By default, assume WORKSPACE=/workspace (so ComfyUI is at /workspace/ComfyUI)
 WORKSPACE="${WORKSPACE:-/workspace}"
 
-# If the network volume already has its own ComfyUI/models, use that; otherwise use the local path.
+# If /runpod-volume/ComfyUI/models exists, use that (so downloads persist on the network volume)
 if [ -d "/runpod-volume/ComfyUI/models" ]; then
   BASE_MODELS_DIR="/runpod-volume/ComfyUI/models"
   echo "🔧 Using network-mounted models directory: $BASE_MODELS_DIR"
@@ -24,74 +42,79 @@ else
   echo "🔧 Using local models directory: $BASE_MODELS_DIR"
 fi
 
-# Define a simple list of “category → env var → target subdirectory”
-# You can add more lines if you introduce new categories later.
-declare -A CATEGORY_MAP=(
-  [checkpoints]="CHECKPOINT_URLS"
-  [unet]="UNET_URLS"
-  [loras]="LORA_URLS"
-  [controlnet]="CONTROLNET_URLS"
-  [clip]="CLIP_URLS"
-  [text_encoders]="TEXT_ENCODER_URLS"
-)
+# Make sure the root “models” folder exists
+mkdir -p "$BASE_MODELS_DIR"
 
-# ──────── 2. Create Category Folders ────────────────────────────────────────────
+# ──────────── 1. Fetch and parse the MODEL_LIST_URL ──────────────────────────────
 
-echo "🔧 Ensuring category folders exist under: $BASE_MODELS_DIR"
-for category in "${!CATEGORY_MAP[@]}"; do
-  target_dir="$BASE_MODELS_DIR/$category"
-  mkdir -p "$target_dir"
-  echo "   • Created (or already existed): $target_dir"
-done
+if [[ -z "${MODEL_LIST_URL:-}" ]]; then
+  echo "⚠️  MODEL_LIST_URL is not set or is empty. Nothing to provision."
+  exit 0
+fi
 
-# ──────── 3. Download Helper Function ───────────────────────────────────────────
+echo "📥 Downloading MODEL_LIST_URL: $MODEL_LIST_URL"
 
-download_category() {
-  local category="$1"            # e.g. "checkpoints"
-  local env_var_name="$2"        # e.g. "CHECKPOINT_URLS"
-  local raw_list="${!env_var_name:-}"  # Value of that environment variable
+TMP_LIST_FILE="$(mktemp)"
+if ! curl -fsSL "$MODEL_LIST_URL" -o "$TMP_LIST_FILE"; then
+  echo "❌ Failed to download MODEL_LIST_URL ($MODEL_LIST_URL). Exiting."
+  rm -f "$TMP_LIST_FILE"
+  exit 1
+fi
 
-  # If the variable is empty or undefined, skip:
-  if [[ -z "$raw_list" ]]; then
-    echo "   ◦ No URLs specified for $category (env var $env_var_name is empty). Skipping."
-    return 0
+# ──────────── 2. Loop over each valid line (category|url) ─────────────────────────
+
+echo "📂 Processing each line in the model list..."
+
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  # Trim leading/trailing whitespace
+  line="$(echo "$raw_line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+  # Skip comments or blank lines
+  if [[ -z "$line" || "${line:0:1}" == "#" ]]; then
+    continue
   fi
 
-  local dest_dir="$BASE_MODELS_DIR/$category"
+  # Split on the first '|'
+  if [[ "$line" != *"|"* ]]; then
+    echo "⚠️  Skipping invalid line (missing '|'): $line"
+    continue
+  fi
 
-  # Split comma-separated URLs and loop
-  IFS=',' read -r -a url_array <<< "$raw_list"
-  for url in "${url_array[@]}"; do
-    # Trim whitespace around the URL
-    url="$(echo "$url" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-    if [[ -z "$url" ]]; then
-      continue
-    fi
+  category="${line%%|*}"
+  url="${line#*|}"
 
-    filename="$(basename "$url")"
-    dest_path="$dest_dir/$filename"
+  # Trim again in case of stray spaces
+  category="$(echo "$category" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  url="$(echo "$url" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
-    if [[ -f "$dest_path" ]]; then
-      echo "     • [$category] $filename already exists — skipping."
-      continue
-    fi
+  if [[ -z "$category" || -z "$url" ]]; then
+    echo "⚠️  Skipping invalid line (empty category or URL): $line"
+    continue
+  fi
 
-    echo "     → [$category] Downloading $url ..."
-    if ! wget --progress=dot:giga -O "$dest_path" "$url"; then
-      echo "       ⚠️  Failed to download $url. Removing partial file and continuing."
-      rm -f "$dest_path"
-      continue
-    fi
-  done
-}
+  # Determine the destination folder for this category
+  dest_dir="$BASE_MODELS_DIR/$category"
+  mkdir -p "$dest_dir"
 
-# ──────── 4. Loop Over Each Category & Download ─────────────────────────────────
+  # Determine filename from URL
+  filename="$(basename "$url")"
+  dest_path="$dest_dir/$filename"
 
-echo "📥 Starting provisioning of category-based model downloads…"
-for category in "${!CATEGORY_MAP[@]}"; do
-  env_var_name="${CATEGORY_MAP[$category]}"
-  echo "  ▶ Processing category '$category' (using env var $env_var_name)"
-  download_category "$category" "$env_var_name"
-done
+  # If file already exists, skip
+  if [[ -f "$dest_path" ]]; then
+    echo "   • [$category] $filename already exists; skipping."
+    continue
+  fi
 
-echo "✅ Provisioning complete. Check $BASE_MODELS_DIR for downloaded (or preexisting) files."
+  # Download into the category folder
+  echo "   → [$category] Downloading $url → $dest_path"
+  if ! wget --progress=dot:giga -O "$dest_path" "$url"; then
+    echo "     ❌ Failed to download $url. Removing partial file."
+    rm -f "$dest_path"
+    continue
+  fi
+
+done < "$TMP_LIST_FILE"
+
+rm -f "$TMP_LIST_FILE"
+echo "✅ Provisioning complete. Check contents of $BASE_MODELS_DIR."
