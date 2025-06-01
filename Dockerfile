@@ -19,6 +19,8 @@ ENV COMFYUI_VENV=$VENV_DIR/comfyui
 ENV JUPYTER_VENV=$VENV_DIR/jupyter
 ENV PATH="$COMFYUI_VENV/bin:$JUPYTER_VENV/bin:$PATH"
 
+RUN apt update && apt install -y git
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
