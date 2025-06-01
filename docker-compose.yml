@@ -7,14 +7,14 @@ services:
       context: ./build
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.10}
-        PYTORCH_VERSION: ${PYTORCH_VERSION:-2.4.1}
+        PYTORCH_VERSION: ${PYTORCH_VERSION:-2.5.0}
         COMFYUI_BUILD_REF: ${COMFYUI_BUILD_REF:-}
         # Base on Python image which is base + python + jupyter
-        IMAGE_BASE: ${IMAGE_BASE:-ghcr.io/ai-dock/python:${PYTHON_VERSION:-3.10}-v2-cuda-12.1.1-base-22.04}
+        IMAGE_BASE: ${IMAGE_BASE:-ghcr.io/ai-dock/python:${PYTHON_VERSION:-3.10}-v2-cuda-12.2.0-base-22.04}
       tags:
-        - "ghcr.io/ai-dock/comfyui:${IMAGE_TAG:-pytorch-${PYTORCH_VERSION:-2.3.0}-py3.10-v2-cuda-12.1.1-base-22.04}"
+        - "ghcr.io/ai-dock/comfyui:${IMAGE_TAG:-pytorch-${PYTORCH_VERSION:-2.5.0}-py3.10-v2-cuda-12.2.0-base-22.04}"
         
-    image: ghcr.io/ai-dock/comfyui:${IMAGE_TAG:-pytorch-${PYTORCH_VERSION:-2.3.0}-py3.10-v2-cuda-12.1.1-base-22.04}
+    image: ghcr.io/ai-dock/comfyui:${IMAGE_TAG:-pytorch-${PYTORCH_VERSION:-2.5.0}-py3.10-v2-cuda-12.2.0-base-22.04}
     
     ## For Nvidia GPU's - You probably want to uncomment this
     #deploy:
@@ -67,6 +67,12 @@ services:
         - CF_QUICK_TUNNELS=${CF_QUICK_TUNNELS:-true}
         - CIVITAI_TOKEN=${CIVITAI_TOKEN:-}
         - HF_TOKEN=${HF_TOKEN:-}
+        - CHECKPOINT_URLS=${CHECKPOINT_URLS:-}
+        - UNET_URLS=${UNET_URLS:-}
+        - LORA_URLS=${LORA_URLS:-}
+        - CONTROLNET_URLS=${CONTROLNET_URLS:-}
+        - CLIP_URLS=${CLIP_URLS:-}
+        - TEXT_ENCODER_URLS=${TEXT_ENCODER_URLS:-}
         - WEB_ENABLE_AUTH=${WEB_ENABLE_AUTH:-true}
         - WEB_ENABLE_HTTPS=${WEB_ENABLE_HTTPS:-false}
         - WEB_USER=${WEB_USER:-user}

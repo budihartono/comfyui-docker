@@ -44,6 +44,18 @@ if [ -d "/runpod-volume" ]; then
     fi
 fi
 
+# >>> Begin new provisioning block >>>
+# Run category-based provisioning if the script exists
+echo "📥 Running provisioning script (if configured)…"
+if [ -x "/scripts/provision_models.sh" ]; then
+  # Ensure WORKSPACE is set so provision_models.sh knows where ComfyUI lives
+  export WORKSPACE="${WORKSPACE:-/workspace}"
+  /scripts/provision_models.sh
+else
+  echo "   – no provisioning script found at /scripts/provision_models.sh, skipping."
+fi
+# <<< End new provisioning block <<<
+
 # Debug: Final structure
 echo "Final directory structure:"
 tree -L 2 /workspace/ComfyUI

@@ -1,0 +1,9 @@
+# macOS system files
+.DS_Store
+
+# Thumbnails
+._*
+
+# macOS directory service files
+.Spotlight-V100
+.Trashes
