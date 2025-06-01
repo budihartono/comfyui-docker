@@ -32,5 +32,5 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/your-repo:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/your-repo:${{ env.IMAGE_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/comfyui-docker:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/comfyui-docker:${{ env.IMAGE_TAG }}
